@@ -12,8 +12,12 @@ export async function sendChatMessage(
   message: string,
   conversationId?: string
 ): Promise<ChatResponse> {
-  // Use fixed test token for demo
-  const token = 'demo-token-123';
+  // Get the actual auth token from localStorage
+  const token = localStorage.getItem('auth-token');
+  
+  if (!token) {
+    throw new Error('Please logout and login again to refresh your session.');
+  }
   
   const CHAT_API_URL = process.env.NEXT_PUBLIC_CHAT_API_URL || 'https://hackathon-todo-app-by-wajahat-ali-l.vercel.app/api/chat';
   
@@ -30,6 +34,9 @@ export async function sendChatMessage(
   });
   
   if (!response.ok) {
+    if (response.status === 401) {
+      throw new Error('Please logout and login again to refresh your session.');
+    }
     throw new Error(`API error: ${response.status}`);
   }
   
