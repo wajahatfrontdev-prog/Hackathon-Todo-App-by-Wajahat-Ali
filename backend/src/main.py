@@ -45,10 +45,10 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Configure CORS - Perfect for Vercel + local
+# Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow all for hackathon demo
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -62,18 +62,14 @@ async def _allow_private_network(request: Request, call_next):
         response.headers["Access-Control-Allow-Private-Network"] = "true"
     return response
 
-# 🔥 FINAL FIX: Correct router inclusion
-# tasks_router already has prefix="/api/tasks" in tasks.py
-# So we include it WITHOUT additional prefix to avoid double /api/tasks/api/tasks
-app.include_router(tasks_router)  # ← No prefix here!
+# 🔥 FINAL FIX: tasks_router already has prefix="/api/tasks" in tasks.py
+# So include WITHOUT any extra prefix!
+app.include_router(tasks_router)  # 👈 YE LINE ONLY - NO PREFIX HERE!
 
-# If you want to be extra safe, you can explicitly set empty prefix
-# app.include_router(tasks_router, prefix="")
-
-# Auth routes (login, register etc.) - usually /api/auth or no prefix
+# Auth routes
 app.include_router(auth_router)
 
-# Chat route for AI assistant
+# Chat route
 app.include_router(chat_router)
 
 # Health check endpoint
