@@ -66,9 +66,10 @@ CORS_ORIGINS: list[str] = [
     "http://localhost:3001",  # Alternate port
     "http://127.0.0.1:3001",
     "https://animated-fortnight-v6g4657xxw572w47j-3000.app.github.dev",  # Codespace frontend
-    "https://animated-fortnight-v6g4657xxw572w47j-3001.app.github.dev",
+    "https://animated-fortnight-v6g4657xxw9jcgr5-3000.app.github.dev",
     "https://animated-journey-jj46jgwxxw9jcgr5-3000.app.github.dev",  # Current frontend URL
     "https://redesigned-guide-r45w6jg4px56hr5p-3000.app.github.dev",  # Updated frontend URL
+    "https://hackathon-todo-app-by-wajahat-fq3nc9zlz.vercel.app",  # Vercel deployment
     "https://simple-q7ez.vercel.app",  # Vercel frontend
     "*",  # Allow all for development
 ]
