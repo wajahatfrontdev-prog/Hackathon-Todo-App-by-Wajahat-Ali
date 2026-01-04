@@ -144,33 +144,54 @@ export default function DashboardPage() {
     setLoading(true);
     setError('');
     
+    const token = localStorage.getItem('auth-token');
+    if (!token) {
+      setError('Please login again');
+      setLoading(false);
+      return;
+    }
+    
     try {
-      let updatedTasks;
       if (editingId) {
-        updatedTasks = tasks.map(t => 
-          t.id === editingId 
-            ? { ...t, title: newTask.trim(), description: newDescription.trim(), priority: newPriority, category: newCategory, dueDate: newDueDate, recurring: newRecurring }
-            : t
-        );
-        setTasks(updatedTasks);
-        setEditingId(null);
+        // Update existing task via API
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'https://hackathon-todo-app-by-wajahat-ali-l.vercel.app'}/api/tasks/${editingId}`, {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            title: newTask.trim(),
+            description: newDescription.trim(),
+          }),
+        });
+        
+        if (response.ok) {
+          await loadTasks(); // Reload from backend
+          setEditingId(null);
+        } else {
+          setError('Failed to update task');
+        }
       } else {
-        const newTaskObj = { 
-          id: Date.now(), 
-          title: newTask.trim(), 
-          description: newDescription.trim(),
-          completed: false,
-          priority: newPriority,
-          category: newCategory,
-          dueDate: newDueDate,
-          recurring: newRecurring
-        };
-        updatedTasks = [...tasks, newTaskObj];
-        setTasks(updatedTasks);
+        // Create new task via API
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'https://hackathon-todo-app-by-wajahat-ali-l.vercel.app'}/api/tasks`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            title: newTask.trim(),
+            description: newDescription.trim(),
+          }),
+        });
+        
+        if (response.ok) {
+          await loadTasks(); // Reload from backend
+        } else {
+          setError('Failed to create task');
+        }
       }
-      
-      // Save to localStorage
-      localStorage.setItem('dashboard-tasks', JSON.stringify(updatedTasks));
       
       setNewTask('');
       setNewDescription('');
@@ -187,11 +208,26 @@ export default function DashboardPage() {
   }
 
   function toggleTask(id: number) {
+    const token = localStorage.getItem('auth-token');
+    if (!token) return;
+    
+    // Optimistic update
     const updatedTasks = tasks.map(task => 
       task.id === id ? { ...task, completed: !task.completed } : task
     );
     setTasks(updatedTasks);
-    localStorage.setItem('dashboard-tasks', JSON.stringify(updatedTasks));
+    
+    // Update backend
+    fetch(`${process.env.NEXT_PUBLIC_API_URL || 'https://hackathon-todo-app-by-wajahat-ali-l.vercel.app'}/api/tasks/${id}/complete`, {
+      method: 'PATCH',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    }).catch(() => {
+      // Revert on error
+      loadTasks();
+    });
   }
 
   async function deleteTask(id: number) {

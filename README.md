@@ -2,6 +2,8 @@
 
 A modern, responsive multi-user todo web application with AI-powered conversational task management.
 
+**Live Demo:** [https://hackathon-todo-app-by-wajahat-ali-l.vercel.app](https://hackathon-todo-app-by-wajahat-ali-l.vercel.app)
+
 ## Features
 
 ### Phase II - Core Task Management
