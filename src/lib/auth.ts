@@ -35,7 +35,7 @@ async function createJWT(userId: string, email: string): Promise<string> {
   );
   
   const signature = await crypto.subtle.sign('HMAC', key, encoder.encode(data));
-  const encodedSignature = btoa(String.fromCharCode(...new Uint8Array(signature)))
+  const encodedSignature = btoa(String.fromCharCode(...Array.from(new Uint8Array(signature))))
     .replace(/[+/]/g, (m) => ({ '+': '-', '/': '_' }[m]!))
     .replace(/=/g, '');
   
