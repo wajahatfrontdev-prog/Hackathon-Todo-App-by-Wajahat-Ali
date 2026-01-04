@@ -8,25 +8,38 @@ interface Session {
   token: string;
 }
 
-// Simple JWT creation for frontend
-function createJWT(userId: string, email: string): string {
+// Create proper JWT token using crypto
+async function createJWT(userId: string, email: string): Promise<string> {
   const header = { alg: 'HS256', typ: 'JWT' };
-  // Create proper UUID format from email
-  const emailHash = btoa(email).replace(/[^a-zA-Z0-9]/g, '').substring(0, 32);
-  const uuid = `${emailHash.substring(0,8)}-${emailHash.substring(8,12)}-${emailHash.substring(12,16)}-${emailHash.substring(16,20)}-${emailHash.substring(20,32)}`;
-  
   const payload = {
-    sub: uuid,
+    sub: userId,
     email: email,
     iat: Math.floor(Date.now() / 1000),
     exp: Math.floor(Date.now() / 1000) + (24 * 60 * 60) // 24 hours
   };
   
-  const encodedHeader = btoa(JSON.stringify(header)).replace(/=/g, '');
-  const encodedPayload = btoa(JSON.stringify(payload)).replace(/=/g, '');
-  const signature = btoa(`${encodedHeader}.${encodedPayload}.signature`).replace(/=/g, '');
+  const encodedHeader = btoa(JSON.stringify(header)).replace(/[+/]/g, (m) => ({ '+': '-', '/': '_' }[m]!)).replace(/=/g, '');
+  const encodedPayload = btoa(JSON.stringify(payload)).replace(/[+/]/g, (m) => ({ '+': '-', '/': '_' }[m]!)).replace(/=/g, '');
   
-  return `${encodedHeader}.${encodedPayload}.${signature}`;
+  // Create signature using HMAC-SHA256
+  const secret = 'your-secure-secret-key-min-32-characters'; // Should match backend
+  const data = `${encodedHeader}.${encodedPayload}`;
+  
+  const encoder = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    'raw',
+    encoder.encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign']
+  );
+  
+  const signature = await crypto.subtle.sign('HMAC', key, encoder.encode(data));
+  const encodedSignature = btoa(String.fromCharCode(...new Uint8Array(signature)))
+    .replace(/[+/]/g, (m) => ({ '+': '-', '/': '_' }[m]!))
+    .replace(/=/g, '');
+  
+  return `${data}.${encodedSignature}`;
 }
 
 export async function signIn(email: string, password: string): Promise<Session> {
@@ -39,7 +52,7 @@ export async function signIn(email: string, password: string): Promise<Session> 
   // Generate unique user ID from email in UUID format
   const emailHash = btoa(email).replace(/[^a-zA-Z0-9]/g, '').substring(0, 32);
   const userId = `${emailHash.substring(0,8)}-${emailHash.substring(8,12)}-${emailHash.substring(12,16)}-${emailHash.substring(16,20)}-${emailHash.substring(20,32)}`;
-  const token = createJWT(userId, email);
+  const token = await createJWT(userId, email);
   
   const session = {
     user: { id: userId, email },
@@ -61,7 +74,7 @@ export async function signUp(email: string, password: string): Promise<Session> 
   // Generate unique user ID from email in UUID format
   const emailHash = btoa(email).replace(/[^a-zA-Z0-9]/g, '').substring(0, 32);
   const userId = `${emailHash.substring(0,8)}-${emailHash.substring(8,12)}-${emailHash.substring(12,16)}-${emailHash.substring(16,20)}-${emailHash.substring(20,32)}`;
-  const token = createJWT(userId, email);
+  const token = await createJWT(userId, email);
   
   const session = {
     user: { id: userId, email },
