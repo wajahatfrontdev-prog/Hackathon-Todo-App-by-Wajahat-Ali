@@ -4,13 +4,12 @@ Task API routes - DEMO MODE: Auth bypassed
 
 import logging
 from typing import Annotated
-from fastapi import APIRouter, HTTPException, Request, status, Depends  # 👈 Depends yahan add karo
+from fastapi import APIRouter, HTTPException, Request, status, Depends
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from uuid import UUID
+from uuid import UUID, uuid4  # 👈 uuid4 add kiya for dummy user_id
 from ..db import get_db
 from ..models import Task, TaskCreate, TaskUpdate, TaskResponse, TaskListResponse
-# get_current_user import COMMENTED OUT - no auth for demo
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +19,6 @@ router = APIRouter(prefix="/api/tasks", tags=["tasks"])
 async def list_tasks(
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> TaskListResponse:
-    # All tasks (no user filter for demo)
     result = await db.execute(select(Task).order_by(Task.created_at.desc()))
     tasks = result.scalars().all()
     return TaskListResponse(
@@ -36,8 +34,12 @@ async def create_task(
     if not task_data.title.strip():
         raise HTTPException(status_code=400, detail="Title is required")
     
+    # 🔥 FIX: Dummy fixed UUID (ya random) daal do taaki NOT NULL error na aaye
+    dummy_user_id = uuid4()  # Har task ke liye unique dummy user
+    # Ya fixed ek UUID: UUID("00000000-0000-0000-0000-000000000001")
+
     task = Task(
-        user_id=None,  # Demo mode: no user
+        user_id=dummy_user_id,  # 👈 Ye MUST hai, None mat daalo
         title=task_data.title.strip(),
         description=task_data.description.strip() if task_data.description else None,
         completed=False,
@@ -45,9 +47,8 @@ async def create_task(
     db.add(task)
     await db.commit()
     await db.refresh(task)
+    logger.info(f"Task created in demo mode: {task.id}")
     return TaskResponse.from_orm(task)
-
-# Baaki routes mein bhi same: current_user_id parameter hata do
 
 @router.get("/{task_id}", response_model=TaskResponse)
 async def get_task(task_id: UUID, db: Annotated[AsyncSession, Depends(get_db)]) -> TaskResponse:
