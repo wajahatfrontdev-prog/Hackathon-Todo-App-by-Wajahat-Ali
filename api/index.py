@@ -1,5 +1,12 @@
+import sys
+import os
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'backend', 'src'))
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from routes.tasks import router as tasks_router
+from routes.chat import router as chat_router
+from db import init_db
 
 app = FastAPI(title="Todo API")
 
@@ -10,6 +17,15 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Initialize database
+@app.on_event("startup")
+async def startup_event():
+    await init_db()
+
+# Include routers
+app.include_router(tasks_router)
+app.include_router(chat_router)
 
 @app.get("/")
 def read_root():
