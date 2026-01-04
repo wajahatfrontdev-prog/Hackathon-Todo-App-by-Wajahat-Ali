@@ -35,16 +35,18 @@ class TaskAgent:
 For greetings (hi, hello), respond warmly and ask how you can help.
 
 IMPORTANT RULES:
-- When user says "add description to [task]" or "in [task] also add description", use update_task
-- When adding NEW tasks, only use description if user explicitly provides one in the same message
+- When user says "show all task" or "show all tasks" or "list tasks", use list_tasks
+- When user says "rename [old] to [new]", use update_task with current_title=[old] and title=[new]
+- When user says "delete [task]", use delete_task with title=[task]
+- When adding NEW tasks, only use description if user explicitly provides one
 - Do NOT make up descriptions
 - Use exact titles as provided
 
 Available tools:
 - add_task: Create NEW tasks only
-- update_task: Modify existing tasks (use current_title to find task)
+- update_task: Modify existing tasks (use current_title to find task, then provide new title)
 - list_tasks: Show tasks  
-- delete_task: Remove tasks
+- delete_task: Remove tasks (use title to find and delete)
 - complete_task: Mark as done
 
 Always be friendly and execute the right tool for each request."""
@@ -99,11 +101,11 @@ Always be friendly and execute the right tool for each request."""
                 "type": "function",
                 "function": {
                     "name": "update_task",
-                    "description": "Update a task",
+                    "description": "Update or rename a task. Use current_title to find the task, then provide new title or description.",
                     "parameters": {
                         "type": "object",
                         "properties": {
-                            "current_title": {"type": "string", "description": "Current task title"},
+                            "current_title": {"type": "string", "description": "Current task title to find the task"},
                             "title": {"type": "string", "description": "New title (optional)"},
                             "description": {"type": "string", "description": "New description (optional)"}
                         },
@@ -262,7 +264,9 @@ Always be friendly and execute the right tool for each request."""
         
         elif tool_name == "update_task":
             title = result.get("title", "task")
-            return f"✏️ I've updated '{title}' successfully!"
+            args = tool_call.get("arguments", {})
+            old_title = args.get("current_title", "task")
+            return f"✏️ I've updated '{old_title}' to '{title}' successfully!"
         
         elif tool_name == "complete_task":
             title = result.get("title", "task")
