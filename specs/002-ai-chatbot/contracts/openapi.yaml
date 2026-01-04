@@ -1,0 +1,177 @@
+openapi: 3.1.0
+info:
+  title: Evolution of Todo - Chat API
+  description: Conversational AI interface for task management
+  version: 1.0.0
+  contact:
+    name: Evolution of Todo Team
+
+servers:
+  - url: http://localhost:8000
+    description: Local development server
+  - url: https://api.evolutionoftodo.com
+    description: Production server
+
+security:
+  - BearerAuth: []
+
+paths:
+  /api/chat:
+    post:
+      summary: Send a chat message
+      description: |
+        Send a natural language message to the AI agent.
+        Creates a new conversation if conversation_id is not provided.
+        Returns the AI response with any tool calls that were made.
+      tags:
+        - Chat
+      operationId: sendChatMessage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChatRequest'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatResponse'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized - Invalid or missing JWT
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Conversation not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    ChatRequest:
+      type: object
+      required:
+        - message
+      properties:
+        conversation_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: |
+            Optional. If provided, continues existing conversation.
+            If not provided, creates a new conversation.
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        message:
+          type: string
+          minLength: 1
+          maxLength: 10000
+          description: The user's natural language message
+          example: "Add buy milk to my grocery list"
+      additionalProperties: false
+
+    ChatResponse:
+      type: object
+      required:
+        - conversation_id
+        - response
+      properties:
+        conversation_id:
+          type: string
+          format: uuid
+          description: The conversation ID (existing or newly created)
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        response:
+          type: string
+          description: The AI agent's natural language response
+          example: "I've added 'buy milk' to your grocery list."
+        tool_calls:
+          type: array
+          nullable: true
+          description: List of tool calls made by the agent
+          items:
+            $ref: '#/components/schemas/ToolCall'
+      additionalProperties: false
+
+    ToolCall:
+      type: object
+      required:
+        - tool
+        - arguments
+      properties:
+        tool:
+          type: string
+          description: Name of the tool that was called
+          enum:
+            - add_task
+            - list_tasks
+            - update_task
+            - delete_task
+            - complete_task
+          example: "add_task"
+        arguments:
+          type: object
+          description: Arguments passed to the tool
+          additionalProperties: true
+          example:
+            title: "buy milk"
+            due_date: null
+        result:
+          type: object
+          nullable: true
+          description: Result returned by the tool
+          additionalProperties: true
+          example:
+            success: true
+            task_id: "123e4567-e89b-12d3-a456-426614174000"
+
+    Error:
+      type: object
+      required:
+        - error
+        - message
+      properties:
+        error:
+          type: string
+          description: Error type code
+          enum:
+            - invalid_request
+            - unauthorized
+            - not_found
+            - internal_error
+          example: "not_found"
+        message:
+          type: string
+          description: Human-readable error message
+          example: "Conversation not found or access denied"
+        details:
+          type: object
+          nullable: true
+          description: Additional error details (optional)
+
+tags:
+  - name: Chat
+    description: Conversational AI interface endpoints
