@@ -34,17 +34,24 @@ class TaskAgent:
 
 For greetings (hi, hello), respond warmly and ask how you can help.
 
-IMPORTANT RULES:
-- When user says "show all task" or "show all tasks" or "list tasks", use list_tasks
-- When user says "rename [old] to [new]", use update_task with current_title=[old] and title=[new]
+IMPORTANT PARSING RULES:
+- When user says "rename X to Y" or "update X to Y": 
+  * Extract X as current_title (the old name)
+  * Extract Y as title (the new name)
+  * Use update_task with both parameters
+- When user says "show all task" or "list tasks", use list_tasks
 - When user says "delete [task]", use delete_task with title=[task]
 - When adding NEW tasks, only use description if user explicitly provides one
 - Do NOT make up descriptions
 - Use exact titles as provided
 
+EXAMPLES:
+- "rename buy biryani to buy tikka" → update_task(current_title="buy biryani", title="buy tikka")
+- "update buy milk to get milk" → update_task(current_title="buy milk", title="get milk")
+
 Available tools:
 - add_task: Create NEW tasks only
-- update_task: Modify existing tasks (use current_title to find task, then provide new title)
+- update_task: Modify existing tasks (MUST provide current_title to find task, then new title)
 - list_tasks: Show tasks  
 - delete_task: Remove tasks (use title to find and delete)
 - complete_task: Mark as done
@@ -101,12 +108,12 @@ Always be friendly and execute the right tool for each request."""
                 "type": "function",
                 "function": {
                     "name": "update_task",
-                    "description": "Update or rename a task. Use current_title to find the task, then provide new title or description.",
+                    "description": "Update or rename a task. MUST extract current_title (old name) and title (new name) from user message. Example: 'rename X to Y' means current_title=X, title=Y",
                     "parameters": {
                         "type": "object",
                         "properties": {
-                            "current_title": {"type": "string", "description": "Current task title to find the task"},
-                            "title": {"type": "string", "description": "New title (optional)"},
+                            "current_title": {"type": "string", "description": "Current task title to find (the old name before 'to')"},
+                            "title": {"type": "string", "description": "New title to set (the new name after 'to')"},
                             "description": {"type": "string", "description": "New description (optional)"}
                         },
                         "required": ["current_title"]
@@ -142,6 +149,10 @@ Always be friendly and execute the right tool for each request."""
         msg_lower = message.lower().strip()
         if msg_lower in ['hi', 'hello', 'hey', 'salam', 'assalam']:
             return "Hello! 😊 How can I help you with your tasks today?", None
+        
+        # Handle rename/update operations directly for better reliability
+        if ('rename' in msg_lower or 'update' in msg_lower) and ' to ' in msg_lower:
+            return await self._handle_rename_update(user_id, message, mcp_server)
         
         # Fallback if Groq not configured
         if not self.is_configured():
@@ -200,10 +211,84 @@ Always be friendly and execute the right tool for each request."""
             
         except Exception as e:
             return f"I encountered an error: {str(e)}", None
-    
-    async def _fallback_process(self, user_id: str, message: str, mcp_server):
+    async def _handle_rename_update(self, user_id: str, message: str, mcp_server):
+        """Handle rename/update operations directly for better reliability."""
+        try:
+            # Parse the rename/update command
+            msg_lower = message.lower()
+            
+            # Split on ' to ' to get old and new titles
+            if ' to ' in message:
+                parts = message.split(' to ', 1)  # Split only on first occurrence
+                if len(parts) == 2:
+                    # Extract old title (remove 'rename' or 'update' prefix)
+                    old_part = parts[0].strip()
+                    for prefix in ['rename', 'update']:
+                        if old_part.lower().startswith(prefix):
+                            old_part = old_part[len(prefix):].strip()
+                            break
+                    
+                    # Extract new title (remove quotes if present)
+                    new_title = parts[1].strip().strip('"').strip("'")
+                    
+                    if old_part and new_title:
+                        # Call the update function directly
+                        result = await mcp_server.call_tool("update_task", {
+                            "user_id": user_id,
+                            "current_title": old_part,
+                            "title": new_title
+                        })
+                        
+                        # Parse result
+                        if result and result[0].text:
+                            result_data = json.loads(result[0].text)
+                            if result_data.get("status") == "updated":
+                                return f"✏️ I've updated '{old_part}' to '{new_title}' successfully!", [{
+                                    "tool": "update_task",
+                                    "arguments": {"user_id": user_id, "current_title": old_part, "title": new_title},
+                                    "result": result_data
+                                }]
+                            else:
+                                return f"❌ Task '{old_part}' not found. Please check the task name.", None
+            
+            return "❌ Please use format: 'rename [old name] to [new name]'", None
+            
+        except Exception as e:
+            return f"❌ Error updating task: {str(e)}", None
         """Simple fallback when Groq not available."""
         msg = message.lower()
+        
+        # Handle rename operations
+        if 'rename' in msg and ' to ' in msg:
+            parts = message.split(' to ')
+            if len(parts) == 2:
+                old_title = parts[0].replace('rename', '').strip()
+                new_title = parts[1].strip().strip('"').strip("'")
+                try:
+                    result = await mcp_server._update_task({
+                        "user_id": user_id, 
+                        "current_title": old_title, 
+                        "title": new_title
+                    })
+                    return f"✏️ I've updated '{old_title}' to '{new_title}' successfully!", None
+                except Exception as e:
+                    return f"❌ Couldn't rename task: {str(e)}", None
+        
+        # Handle update operations
+        if 'update' in msg and ' to ' in msg:
+            parts = message.split(' to ')
+            if len(parts) == 2:
+                old_title = parts[0].replace('update', '').strip()
+                new_title = parts[1].strip().strip('"').strip("'")
+                try:
+                    result = await mcp_server._update_task({
+                        "user_id": user_id, 
+                        "current_title": old_title, 
+                        "title": new_title
+                    })
+                    return f"✏️ I've updated '{old_title}' to '{new_title}' successfully!", None
+                except Exception as e:
+                    return f"❌ Couldn't update task: {str(e)}", None
         
         if 'add' in msg:
             title = message.replace('add', '').strip()
@@ -263,10 +348,13 @@ Always be friendly and execute the right tool for each request."""
             return f"🗑️ I've removed '{title}' from your task list."
         
         elif tool_name == "update_task":
-            title = result.get("title", "task")
-            args = tool_call.get("arguments", {})
-            old_title = args.get("current_title", "task")
-            return f"✏️ I've updated '{old_title}' to '{title}' successfully!"
+            if result.get("status") == "updated":
+                title = result.get("title", "task")
+                args = tool_call.get("arguments", {})
+                old_title = args.get("current_title", "task")
+                return f"✏️ I've updated '{old_title}' to '{title}' successfully!"
+            else:
+                return "❌ Task not found or couldn't be updated. Please check the task name."
         
         elif tool_name == "complete_task":
             title = result.get("title", "task")

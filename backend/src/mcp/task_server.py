@@ -267,15 +267,28 @@ class TaskMCPServer:
                 if "task_id" in args and args["task_id"]:
                     query = query.where(Task.id == UUID(args["task_id"]))
                 elif "current_title" in args and args["current_title"]:
-                    query = query.where(Task.title.ilike(f"%{args['current_title']}%"))
+                    # First try exact match, then partial match
+                    exact_query = query.where(Task.title == args["current_title"])
+                    result = await db.execute(exact_query)
+                    task = result.scalar_one_or_none()
+                    
+                    if not task:
+                        # Try partial match if exact match fails
+                        partial_query = query.where(Task.title.ilike(f"%{args['current_title']}%"))
+                        result = await db.execute(partial_query)
+                        task = result.scalar_one_or_none()
                 else:
                     return [TextContent(type="text", text="Provide task_id or current_title")]
                 
-                result = await db.execute(query)
-                task = result.scalar_one_or_none()
+                if not task:
+                    result = await db.execute(query)
+                    task = result.scalar_one_or_none()
                 
                 if not task:
-                    return [TextContent(type="text", text="Task not found")]
+                    return [TextContent(type="text", text=json.dumps({
+                        "status": "error",
+                        "message": "Task not found"
+                    }))]
                 
                 if "title" in args and args["title"]:
                     task.title = args["title"]
@@ -291,7 +304,10 @@ class TaskMCPServer:
                 }
                 return [TextContent(type="text", text=json.dumps(result))]
         except Exception as e:
-            return [TextContent(type="text", text=f"Error: {str(e)}")]
+            return [TextContent(type="text", text=json.dumps({
+                "status": "error",
+                "message": str(e)
+            }))]
 
 
 # Global MCP server instance
