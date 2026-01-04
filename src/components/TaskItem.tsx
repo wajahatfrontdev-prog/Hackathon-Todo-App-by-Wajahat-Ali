@@ -48,7 +48,7 @@ export function TaskItem({
     onTaskUpdate(optimisticTask);
 
     try {
-      const updated = await toggleTaskComplete(task.id);
+      const updated = await toggleTaskComplete(task.id, task.completed);
       onTaskUpdate(updated);
     } catch (err) {
       // Revert on error

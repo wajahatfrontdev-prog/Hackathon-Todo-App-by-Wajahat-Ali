@@ -112,11 +112,11 @@ export async function deleteTask(id: string): Promise<void> {
   }
 }
 
-export async function toggleTaskComplete(id: string): Promise<TaskResponse> {
+export async function toggleTaskComplete(id: string, currentCompleted: boolean): Promise<TaskResponse> {
   const response = await fetch(`${getApiBase()}/api/tasks/${id}/complete`, {
     method: 'PATCH',
     headers: getAuthHeaders(),
-    body: JSON.stringify({ completed: !true }), // Toggle logic
+    body: JSON.stringify({ completed: !currentCompleted }),
   });
 
   if (!response.ok) {

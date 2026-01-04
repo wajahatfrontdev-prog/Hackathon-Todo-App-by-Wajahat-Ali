@@ -25,7 +25,7 @@ class TaskAgent:
                 self.client = Groq(api_key=self.api_key)
             except Exception as e:
                 print(f"Failed to initialize Groq client: {e}")
-                self.client = None
+                return None
         return self.client
         
     def get_system_prompt(self) -> str:
