@@ -75,16 +75,37 @@ async def get_current_user(
     
     try:
         token: str = credentials.credentials
-        # Create unique user ID from token to ensure user isolation
-        import hashlib
-        user_hash = hashlib.md5(token.encode()).hexdigest()
-        # Convert hash to UUID format
-        user_id = UUID(f"{user_hash[:8]}-{user_hash[8:12]}-{user_hash[12:16]}-{user_hash[16:20]}-{user_hash[20:32]}")
-        return user_id
-    except Exception:
+        # Decode JWT token to get user ID
+        payload = jwt.decode(
+            token,
+            BETTER_AUTH_SECRET,
+            algorithms=[JWT_ALGORITHM],
+            options={"require": ["sub"], "verify_exp": True},
+        )
+        user_id_str: str = payload.get("sub")
+        if not user_id_str:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid token: missing user ID",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        return UUID(user_id_str)
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token has expired",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    except jwt.InvalidTokenError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid user ID format",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
