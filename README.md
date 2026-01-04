@@ -8,7 +8,7 @@ A modern, responsive multi-user todo web application with AI-powered conversatio
 
 ### Phase II - Core Task Management
 - **User Authentication**: Sign up, sign in, and sign out with secure JWT-based authentication
-- **Task Management**: Create, read, update, and delete tasks
+- **Task Management**: Creates, read, update, and delete tasks
 - **Completion Tracking**: Toggle task completion status
 - **Data Isolation**: Each user sees only their own tasks
 - **Responsive Design**: Works on mobile and desktop browsers
