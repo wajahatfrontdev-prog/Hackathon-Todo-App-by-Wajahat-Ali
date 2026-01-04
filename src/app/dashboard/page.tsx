@@ -183,7 +183,7 @@ export default function DashboardPage() {
     const token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI5YTZhMzk5My05MWE2LTQxZmUtOTY0NC02ZTcwODljMDkyOGMiLCJpYXQiOjE3Njc0ODA3MTgsImV4cCI6MTc2NzQ4NDMxOH0.f5Ruf68pzotiVLJlZ0nRf7zHYi75dJH820qOBok8jQo';
     
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'https://animated-journey-jj46jgwxxw9jcgr5-8000.app.github.dev'}/api/tasks/${id}`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'https://redesigned-guide-r45w6jg4px56hr5p-8000.app.github.dev'}/api/tasks/${id}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,
