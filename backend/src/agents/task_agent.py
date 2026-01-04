@@ -323,7 +323,11 @@ Always be friendly and execute the right tool for each request."""
                 elif isinstance(result, dict):
                     tasks = result.get("data", result.get("tasks", []))
                 else:
-                    tasks = []
+                    # If result is a string, try to parse it
+                    if isinstance(result, str) and result.startswith('['):
+                        tasks = json.loads(result)
+                    else:
+                        tasks = []
                 
                 if not tasks:
                     return "📝 You don't have any tasks yet."
@@ -334,11 +338,7 @@ Always be friendly and execute the right tool for each request."""
                         continue
                     status = "✅" if task.get("completed") else "⏳"
                     title = task.get('title', 'Untitled')
-                    desc = task.get('description', '')
-                    task_list += f"{i}. {status} {title}"
-                    if desc:
-                        task_list += f" - {desc}"
-                    task_list += "\n"
+                    task_list += f"{i}. {status} {title}\n"
                 return task_list
             except Exception as e:
                 return f"Found tasks but couldn't display them: {str(e)}"
