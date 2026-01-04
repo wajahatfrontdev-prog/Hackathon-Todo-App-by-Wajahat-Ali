@@ -53,41 +53,56 @@ export default function DashboardPage() {
     checkAuth();
   }, [router]);
 
-  // Load tasks from backend API
+  // Listen for chatbot task creation to refresh dashboard
   useEffect(() => {
-    async function loadTasks() {
-      const token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI5YTZhMzk5My05MWE2LTQxZmUtOTY0NC02ZTcwODljMDkyOGMiLCJpYXQiOjE3Njc0ODA3MTgsImV4cCI6MTc2NzQ4NDMxOH0.f5Ruf68pzotiVLJlZ0nRf7zHYi75dJH820qOBok8jQo';
+    const handleTaskCreated = () => {
+      // Reload tasks when chatbot creates a task
+      if (session) {
+        loadTasks();
+      }
+    };
+    
+    window.addEventListener('task-created', handleTaskCreated);
+    return () => window.removeEventListener('task-created', handleTaskCreated);
+  }, [session]);
+
+  // Load tasks function (moved outside useEffect for reuse)
+  const loadTasks = async () => {
+    const token = localStorage.getItem('auth-token');
+    if (!token) return;
+    
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'https://hackathon-todo-app-by-wajahat-ali-l.vercel.app'}/api/tasks`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
       
-      try {
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'https://hackathon-todo-app-by-wajahat-ali-lastof-250bbwsmx.vercel.app'}/api/tasks`, {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          },
-        });
-        
-        if (response.ok) {
-          const data = await response.json();
-          setTasks(data.tasks || []);
-        } else {
-          console.error('API error:', response.status);
-          setTasks([]);
-        }
-      } catch (error) {
-        console.error('Failed to load tasks:', error);
+      if (response.ok) {
+        const data = await response.json();
+        setTasks(data.tasks || []);
+      } else {
+        console.error('API error:', response.status);
         setTasks([]);
       }
+    } catch (error) {
+      console.error('Failed to load tasks:', error);
+      setTasks([]);
     }
-    
+  };
+
+  // Load tasks from backend API
+  useEffect(() => {
     if (session) {
       loadTasks();
     }
     
-    // Auto-refresh every 3 seconds
+    // Auto-refresh every 5 seconds (reduced frequency)
     const interval = setInterval(() => {
       if (session) {
         loadTasks();
       }
-    }, 3000);
+    }, 5000);
     
     return () => clearInterval(interval);
   }, [session]);
@@ -180,10 +195,11 @@ export default function DashboardPage() {
   }
 
   async function deleteTask(id: number) {
-    const token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI5YTZhMzk5My05MWE2LTQxZmUtOTY0NC02ZTcwODljMDkyOGMiLCJpYXQiOjE3Njc0ODA3MTgsImV4cCI6MTc2NzQ4NDMxOH0.f5Ruf68pzotiVLJlZ0nRf7zHYi75dJH820qOBok8jQo';
+    const token = localStorage.getItem('auth-token');
+    if (!token) return;
     
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'https://hackathon-todo-app-by-wajahat-ali-lastof-250bbwsmx.vercel.app'}/api/tasks/${id}`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'https://hackathon-todo-app-by-wajahat-ali-l.vercel.app'}/api/tasks/${id}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,

@@ -97,6 +97,12 @@ export function ChatInterface() {
         return [...withoutTemp, newUserMessage, assistantMessage];
       });
 
+      // Trigger dashboard refresh if task was created
+      if (response.tool_calls?.some(tc => tc.tool === 'add_task' || tc.tool === 'create_task')) {
+        // Dispatch custom event to refresh dashboard
+        window.dispatchEvent(new CustomEvent('task-created', { detail: { refresh: true } }));
+      }
+
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to send message';
       setError(errorMessage);
