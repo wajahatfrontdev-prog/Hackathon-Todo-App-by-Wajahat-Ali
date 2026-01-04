@@ -211,19 +211,23 @@ export default function DashboardPage() {
     const token = localStorage.getItem('auth-token');
     if (!token) return;
     
+    const task = tasks.find(t => t.id === id);
+    if (!task) return;
+    
     // Optimistic update
     const updatedTasks = tasks.map(task => 
       task.id === id ? { ...task, completed: !task.completed } : task
     );
     setTasks(updatedTasks);
     
-    // Update backend
+    // Update backend with correct completed value
     fetch(`${process.env.NEXT_PUBLIC_API_URL || 'https://hackathon-todo-app-by-wajahat-ali-l.vercel.app'}/api/tasks/${id}/complete`, {
       method: 'PATCH',
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
+      body: JSON.stringify({ completed: !task.completed })
     }).catch(() => {
       // Revert on error
       loadTasks();

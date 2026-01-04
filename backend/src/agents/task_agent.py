@@ -167,6 +167,10 @@ Always be friendly and execute the right tool for each request."""
             client = self._get_client()
             if not client:
                 return await self._fallback_process(user_id, message, mcp_server)
+            
+            # Add fallback for delete operations
+            if 'delete' in message.lower():
+                return await self._handle_delete_fallback(user_id, message, mcp_server)
                 
             response = client.chat.completions.create(
                 model=self.model,
@@ -211,6 +215,30 @@ Always be friendly and execute the right tool for each request."""
             
         except Exception as e:
             return f"I encountered an error: {str(e)}", None
+    async def _handle_delete_fallback(self, user_id: str, message: str, mcp_server):
+        """Handle delete operations directly."""
+        try:
+            # Extract task title to delete
+            msg_lower = message.lower()
+            if 'delete' in msg_lower:
+                title = message.lower().replace('delete', '').strip()
+                if title:
+                    result = await mcp_server.call_tool("delete_task", {
+                        "user_id": user_id,
+                        "title": title
+                    })
+                    
+                    if result and result[0].text:
+                        result_data = json.loads(result[0].text)
+                        if result_data.get("status") == "deleted":
+                            return f"🗑️ I've removed '{result_data.get('title', title)}' from your task list.", None
+                    
+                    return f"❌ Task '{title}' not found.", None
+            
+            return "❌ Please specify which task to delete.", None
+        except Exception as e:
+            return f"❌ Error deleting task: {str(e)}", None
+
     async def _handle_rename_update(self, user_id: str, message: str, mcp_server):
         """Handle rename/update operations directly for better reliability."""
         try:
