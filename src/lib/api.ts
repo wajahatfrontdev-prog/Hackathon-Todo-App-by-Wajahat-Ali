@@ -19,7 +19,7 @@ export interface TaskUpdate {
   completed?: boolean;
 }
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'https://animated-journey-jj46jgwxxw9jcgr5-8000.app.github.dev';
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'https://redesigned-guide-r45w6jg4px56hr5p-8000.app.github.dev';
 
 function getApiBase(): string {
   return API_BASE.replace(/\/$/, ''); // Remove trailing slash
