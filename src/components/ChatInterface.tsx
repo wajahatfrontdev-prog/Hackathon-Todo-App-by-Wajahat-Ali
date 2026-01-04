@@ -97,10 +97,15 @@ export function ChatInterface() {
         return [...withoutTemp, newUserMessage, assistantMessage];
       });
 
-      // Trigger dashboard refresh if task was created
-      if (response.tool_calls?.some(tc => tc.tool === 'add_task' || tc.tool === 'create_task')) {
-        // Dispatch custom event to refresh dashboard
-        window.dispatchEvent(new CustomEvent('task-created', { detail: { refresh: true } }));
+      // Trigger dashboard refresh for any task operation
+      if (response.tool_calls && response.tool_calls.length > 0) {
+        const taskTools = ['add_task', 'create_task', 'update_task', 'delete_task', 'complete_task'];
+        const hasTaskOperation = response.tool_calls.some(tc => taskTools.includes(tc.tool));
+        
+        if (hasTaskOperation) {
+          // Dispatch custom event to refresh dashboard
+          window.dispatchEvent(new CustomEvent('task-created', { detail: { refresh: true } }));
+        }
       }
 
     } catch (err) {
