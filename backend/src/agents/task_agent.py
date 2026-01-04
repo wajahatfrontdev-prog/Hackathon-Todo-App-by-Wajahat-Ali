@@ -230,12 +230,21 @@ Always be friendly and execute the right tool for each request."""
         
         elif tool_name == "list_tasks":
             try:
-                tasks = result if isinstance(result, list) else result.get("data", [])
+                # Handle different result formats
+                if isinstance(result, list):
+                    tasks = result
+                elif isinstance(result, dict):
+                    tasks = result.get("data", result.get("tasks", []))
+                else:
+                    tasks = []
+                
                 if not tasks:
                     return "📝 You don't have any tasks yet."
                 
                 task_list = "📋 **Your Tasks:**\n\n"
                 for i, task in enumerate(tasks, 1):
+                    if not isinstance(task, dict):
+                        continue
                     status = "✅" if task.get("completed") else "⏳"
                     title = task.get('title', 'Untitled')
                     desc = task.get('description', '')
@@ -244,8 +253,8 @@ Always be friendly and execute the right tool for each request."""
                         task_list += f" - {desc}"
                     task_list += "\n"
                 return task_list
-            except:
-                return "Found tasks but couldn't display them properly."
+            except Exception as e:
+                return f"Found tasks but couldn't display them: {str(e)}"
         
         elif tool_name == "delete_task":
             title = result.get("title", "task")
