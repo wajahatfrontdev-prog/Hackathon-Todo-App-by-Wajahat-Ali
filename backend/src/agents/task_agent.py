@@ -39,6 +39,10 @@ IMPORTANT PARSING RULES:
   * Extract X as current_title (the old name)
   * Extract Y as title (the new name)
   * Use update_task with both parameters
+- When user says "add description to [task]" or "in the task [task] also add description [desc]":
+  * Extract task name as current_title
+  * Extract description text
+  * Use update_task with current_title and description
 - When user says "show all task" or "list tasks", use list_tasks
 - When user says "delete [task]", use delete_task with title=[task]
 - When adding NEW tasks, only use description if user explicitly provides one
@@ -48,10 +52,12 @@ IMPORTANT PARSING RULES:
 EXAMPLES:
 - "rename buy biryani to buy tikka" → update_task(current_title="buy biryani", title="buy tikka")
 - "update buy milk to get milk" → update_task(current_title="buy milk", title="get milk")
+- "add description to buy milk: also buy eggs" → update_task(current_title="buy milk", description="also buy eggs")
+- "in the task buy milk also add description also buy eggs" → update_task(current_title="buy milk", description="also buy eggs")
 
 Available tools:
 - add_task: Create NEW tasks only
-- update_task: Modify existing tasks (MUST provide current_title to find task, then new title)
+- update_task: Modify existing tasks (MUST provide current_title to find task, then new title/description)
 - list_tasks: Show tasks  
 - delete_task: Remove tasks (use title to find and delete)
 - complete_task: Mark as done
@@ -108,7 +114,7 @@ Always be friendly and execute the right tool for each request."""
                 "type": "function",
                 "function": {
                     "name": "update_task",
-                    "description": "Update or rename a task. MUST extract current_title (old name) and title (new name) from user message. Example: 'rename X to Y' means current_title=X, title=Y",
+                    "description": "Update or rename a task, or add/modify description. MUST extract current_title to find existing task. Examples: 'rename X to Y' means current_title=X, title=Y. 'add description to X: desc' means current_title=X, description=desc",
                     "parameters": {
                         "type": "object",
                         "properties": {
@@ -168,6 +174,10 @@ Always be friendly and execute the right tool for each request."""
             if not client:
                 return await self._fallback_process(user_id, message, mcp_server)
             
+            # Add fallback for description updates
+            if ('description' in message.lower() or 'add description' in message.lower()) and ('task' in message.lower() or 'to' in message.lower()):
+                return await self._handle_description_update(user_id, message, mcp_server)
+            
             # Add fallback for add operations
             if 'add' in message.lower():
                 return await self._handle_add_fallback(user_id, message, mcp_server)
@@ -200,17 +210,31 @@ Always be friendly and execute the right tool for each request."""
                     # Add user_id to all tool calls
                     function_args["user_id"] = user_id
                     
-                    # Execute MCP tool
-                    tool_result = await mcp_server.call_tool(function_name, function_args)
-                    
-                    # Extract result text
-                    result_text = tool_result[0].text if tool_result else "No result"
-                    
-                    tool_calls.append({
-                        "tool": function_name,
-                        "arguments": function_args,
-                        "result": json.loads(result_text) if result_text.startswith(('{', '[')) else {"message": result_text}
-                    })
+                    try:
+                        # Execute MCP tool
+                        tool_result = await mcp_server.call_tool(function_name, function_args)
+                        
+                        # Extract result text
+                        result_text = tool_result[0].text if tool_result else "No result"
+                        
+                        # Parse result
+                        try:
+                            parsed_result = json.loads(result_text) if result_text.startswith(('{', '[')) else {"message": result_text}
+                        except json.JSONDecodeError:
+                            parsed_result = {"message": result_text}
+                        
+                        tool_calls.append({
+                            "tool": function_name,
+                            "arguments": function_args,
+                            "result": parsed_result
+                        })
+                    except Exception as e:
+                        print(f"Tool call error: {e}")
+                        tool_calls.append({
+                            "tool": function_name,
+                            "arguments": function_args,
+                            "result": {"error": str(e)}
+                        })
                 
                 # Generate response based on tool results
                 response_text = self._generate_tool_response(tool_calls)
@@ -219,6 +243,78 @@ Always be friendly and execute the right tool for each request."""
             
         except Exception as e:
             return f"I encountered an error: {str(e)}", None
+    async def _handle_description_update(self, user_id: str, message: str, mcp_server):
+        """Handle description update operations directly."""
+        try:
+            msg_lower = message.lower()
+            
+            # Parse patterns like "in the task buy milk also add description also buy eggs"
+            if 'in the task' in msg_lower and 'description' in msg_lower:
+                # Extract task name between "in the task" and "also add description" or "add description"
+                start_idx = msg_lower.find('in the task') + len('in the task')
+                desc_idx = msg_lower.find('description', start_idx)
+                
+                if desc_idx > start_idx:
+                    # Find the task name
+                    task_part = message[start_idx:desc_idx].strip()
+                    # Remove "also add" or similar words
+                    task_part = task_part.replace('also add', '').replace('add', '').strip().strip('"').strip("'")
+                    
+                    # Extract description after "description"
+                    desc_start = message.find('description', desc_idx) + len('description')
+                    description = message[desc_start:].strip().strip('"').strip("'")
+                    
+                    if task_part and description:
+                        result = await mcp_server.call_tool("update_task", {
+                            "user_id": user_id,
+                            "current_title": task_part,
+                            "description": description
+                        })
+                        
+                        if result and result[0].text:
+                            result_data = json.loads(result[0].text)
+                            if result_data.get("status") == "updated":
+                                return f"✏️ I've added the description '{description}' to task '{task_part}'!", [{
+                                    "tool": "update_task",
+                                    "arguments": {"user_id": user_id, "current_title": task_part, "description": description},
+                                    "result": {"status": "updated", "title": task_part}
+                                }]
+                        
+                        return f"❌ Task '{task_part}' not found.", None
+            
+            # Parse patterns like "add description to buy milk: also buy eggs"
+            elif 'add description to' in msg_lower:
+                parts = message.split('add description to', 1)
+                if len(parts) == 2:
+                    rest = parts[1].strip()
+                    if ':' in rest:
+                        task_desc = rest.split(':', 1)
+                        task_name = task_desc[0].strip().strip('"').strip("'")
+                        description = task_desc[1].strip().strip('"').strip("'")
+                        
+                        if task_name and description:
+                            result = await mcp_server.call_tool("update_task", {
+                                "user_id": user_id,
+                                "current_title": task_name,
+                                "description": description
+                            })
+                            
+                            if result and result[0].text:
+                                result_data = json.loads(result[0].text)
+                                if result_data.get("status") == "updated":
+                                    return f"✏️ I've added the description '{description}' to task '{task_name}'!", [{
+                                        "tool": "update_task",
+                                        "arguments": {"user_id": user_id, "current_title": task_name, "description": description},
+                                        "result": {"status": "updated", "title": task_name}
+                                    }]
+                            
+                            return f"❌ Task '{task_name}' not found.", None
+            
+            return "❌ Please use format: 'add description to [task]: [description]' or 'in the task [task] also add description [description]'", None
+            
+        except Exception as e:
+            return f"❌ Error updating description: {str(e)}", None
+
     async def _handle_add_fallback(self, user_id: str, message: str, mcp_server):
         """Handle add operations directly."""
         try:

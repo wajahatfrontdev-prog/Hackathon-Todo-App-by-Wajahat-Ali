@@ -234,21 +234,42 @@ class TaskMCPServer:
                         # If task_id is not a valid UUID, treat it as title
                         query = query.where(Task.title.ilike(f"%{args['task_id']}%"))
                 elif "title" in args and args["title"]:
-                    query = query.where(Task.title.ilike(f"%{args['title']}%"))
+                    # Try exact match first, then partial match
+                    exact_query = query.where(Task.title == args["title"])
+                    result = await db.execute(exact_query)
+                    task = result.scalar_one_or_none()
+                    
+                    if not task:
+                        # Try case-insensitive partial match
+                        query = query.where(Task.title.ilike(f"%{args['title']}%"))
                 else:
                     # If no specific field, check if any argument looks like a title
                     for key, value in args.items():
                         if key not in ["user_id"] and value:
-                            query = query.where(Task.title.ilike(f"%{value}%"))
+                            # Try exact match first
+                            exact_query = query.where(Task.title == value)
+                            result = await db.execute(exact_query)
+                            task = result.scalar_one_or_none()
+                            
+                            if not task:
+                                # Try partial match
+                                query = query.where(Task.title.ilike(f"%{value}%"))
                             break
                     else:
-                        return [TextContent(type="text", text="Provide task_id or title")]
-                
-                result = await db.execute(query)
-                task = result.scalar_one_or_none()
+                        return [TextContent(type="text", text=json.dumps({
+                            "status": "error",
+                            "message": "Provide task_id or title"
+                        }))]
                 
                 if not task:
-                    return [TextContent(type="text", text="Task not found")]
+                    result = await db.execute(query)
+                    task = result.scalar_one_or_none()
+                
+                if not task:
+                    return [TextContent(type="text", text=json.dumps({
+                        "status": "error",
+                        "message": "Task not found"
+                    }))]
                 
                 title = task.title
                 task_id = str(task.id)
