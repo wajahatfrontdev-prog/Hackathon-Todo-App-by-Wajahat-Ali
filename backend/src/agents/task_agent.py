@@ -168,6 +168,10 @@ Always be friendly and execute the right tool for each request."""
             if not client:
                 return await self._fallback_process(user_id, message, mcp_server)
             
+            # Add fallback for add operations
+            if 'add' in message.lower():
+                return await self._handle_add_fallback(user_id, message, mcp_server)
+                
             # Add fallback for delete operations
             if 'delete' in message.lower():
                 return await self._handle_delete_fallback(user_id, message, mcp_server)
@@ -215,6 +219,38 @@ Always be friendly and execute the right tool for each request."""
             
         except Exception as e:
             return f"I encountered an error: {str(e)}", None
+    async def _handle_add_fallback(self, user_id: str, message: str, mcp_server):
+        """Handle add operations directly."""
+        try:
+            # Extract task title to add
+            msg_lower = message.lower()
+            if 'add' in msg_lower:
+                title = message.lower().replace('add', '').strip()
+                if title:
+                    result = await mcp_server.call_tool("add_task", {
+                        "user_id": user_id,
+                        "title": title
+                    })
+                    
+                    if result and result[0].text:
+                        result_data = json.loads(result[0].text)
+                        if result_data.get("status") == "created":
+                            return f"✅ I've added '{result_data.get('title', title)}' to your task list!", [{
+                                "tool": "add_task",
+                                "arguments": {"user_id": user_id, "title": title},
+                                "result": {"status": "created", "title": title, "success": True}
+                            }]
+                    
+                    return f"✅ I've added '{title}' to your task list!", [{
+                        "tool": "add_task",
+                        "arguments": {"user_id": user_id, "title": title},
+                        "result": {"status": "created", "title": title, "success": True}
+                    }]
+            
+            return "❌ Please specify what task to add.", None
+        except Exception as e:
+            return f"❌ Error adding task: {str(e)}", None
+
     async def _handle_delete_fallback(self, user_id: str, message: str, mcp_server):
         """Handle delete operations directly."""
         try:
@@ -283,6 +319,7 @@ Always be friendly and execute the right tool for each request."""
             
         except Exception as e:
             return f"❌ Error updating task: {str(e)}", None
+    async def _fallback_process(self, user_id: str, message: str, mcp_server):
         """Simple fallback when Groq not available."""
         msg = message.lower()
         
@@ -293,12 +330,16 @@ Always be friendly and execute the right tool for each request."""
                 old_title = parts[0].replace('rename', '').strip()
                 new_title = parts[1].strip().strip('"').strip("'")
                 try:
-                    result = await mcp_server._update_task({
+                    result = await mcp_server.call_tool("update_task", {
                         "user_id": user_id, 
                         "current_title": old_title, 
                         "title": new_title
                     })
-                    return f"✏️ I've updated '{old_title}' to '{new_title}' successfully!", None
+                    return f"✏️ I've updated '{old_title}' to '{new_title}' successfully!", [{
+                        "tool": "update_task",
+                        "arguments": {"user_id": user_id, "current_title": old_title, "title": new_title},
+                        "result": {"status": "updated", "title": new_title}
+                    }]
                 except Exception as e:
                     return f"❌ Couldn't rename task: {str(e)}", None
         
@@ -309,24 +350,38 @@ Always be friendly and execute the right tool for each request."""
                 old_title = parts[0].replace('update', '').strip()
                 new_title = parts[1].strip().strip('"').strip("'")
                 try:
-                    result = await mcp_server._update_task({
+                    result = await mcp_server.call_tool("update_task", {
                         "user_id": user_id, 
                         "current_title": old_title, 
                         "title": new_title
                     })
-                    return f"✏️ I've updated '{old_title}' to '{new_title}' successfully!", None
+                    return f"✏️ I've updated '{old_title}' to '{new_title}' successfully!", [{
+                        "tool": "update_task",
+                        "arguments": {"user_id": user_id, "current_title": old_title, "title": new_title},
+                        "result": {"status": "updated", "title": new_title}
+                    }]
                 except Exception as e:
                     return f"❌ Couldn't update task: {str(e)}", None
         
         if 'add' in msg:
             title = message.replace('add', '').strip()
             if title:
-                result = await mcp_server._add_task({"user_id": user_id, "title": title})
-                return f"✅ Added '{title}' to your tasks!", None
+                try:
+                    result = await mcp_server.call_tool("add_task", {"user_id": user_id, "title": title})
+                    return f"✅ I've added '{title}' to your task list!", [{
+                        "tool": "add_task",
+                        "arguments": {"user_id": user_id, "title": title},
+                        "result": {"status": "created", "title": title, "success": True}
+                    }]
+                except Exception as e:
+                    return f"❌ Couldn't add task: {str(e)}", None
         
         if 'show' in msg or 'list' in msg:
-            result = await mcp_server._list_tasks({"user_id": user_id, "status": "all"})
-            return "📋 Your tasks are listed above.", None
+            try:
+                result = await mcp_server.call_tool("list_tasks", {"user_id": user_id, "status": "all"})
+                return "📋 Your tasks are listed above.", None
+            except Exception as e:
+                return f"❌ Couldn't list tasks: {str(e)}", None
         
         return "I can help you add, show, delete, or update tasks. Try 'add buy milk' or 'show tasks'.", None
     
