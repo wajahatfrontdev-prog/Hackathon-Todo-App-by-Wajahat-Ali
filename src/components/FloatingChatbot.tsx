@@ -79,12 +79,22 @@ export function FloatingChatbot() {
 
       setMessages(prev => [...prev, assistantMessage]);
       
-      // Check if any tasks were created and emit event to refresh dashboard
+      // Check if any tasks were created/updated/deleted and emit events to refresh dashboard
       if (response.tool_calls) {
         const taskCreated = response.tool_calls.some(call => 
           call.tool === 'add_task' && call.result?.success
         );
-        if (taskCreated) {
+        const taskUpdated = response.tool_calls.some(call => 
+          call.tool === 'update_task' && call.result?.status === 'updated'
+        );
+        const taskDeleted = response.tool_calls.some(call => 
+          call.tool === 'delete_task' && call.result?.status === 'deleted'
+        );
+        const taskCompleted = response.tool_calls.some(call => 
+          call.tool === 'complete_task' && call.result?.status === 'completed'
+        );
+        
+        if (taskCreated || taskUpdated || taskDeleted || taskCompleted) {
           // Emit custom event to notify dashboard to refresh
           window.dispatchEvent(new CustomEvent('task-created'));
         }

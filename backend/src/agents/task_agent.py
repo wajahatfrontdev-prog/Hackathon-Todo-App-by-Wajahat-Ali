@@ -267,7 +267,11 @@ Always be friendly and execute the right tool for each request."""
                     if result and result[0].text:
                         result_data = json.loads(result[0].text)
                         if result_data.get("status") == "deleted":
-                            return f"🗑️ I've removed '{result_data.get('title', title)}' from your task list.", None
+                            return f"🗑️ I've removed '{result_data.get('title', title)}' from your task list.", [{
+                                "tool": "delete_task",
+                                "arguments": {"user_id": user_id, "title": title},
+                                "result": {"status": "deleted", "title": result_data.get('title', title)}
+                            }]
                     
                     return f"❌ Task '{title}' not found.", None
             
@@ -427,8 +431,11 @@ Always be friendly and execute the right tool for each request."""
                 return f"Found tasks but couldn't display them: {str(e)}"
         
         elif tool_name == "delete_task":
-            title = result.get("title", "task")
-            return f"🗑️ I've removed '{title}' from your task list."
+            if result.get("status") == "deleted":
+                title = result.get("title", "task")
+                return f"🗑️ I've removed '{title}' from your task list."
+            else:
+                return "❌ Task not found or couldn't be deleted."
         
         elif tool_name == "update_task":
             if result.get("status") == "updated":
